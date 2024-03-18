@@ -186,6 +186,13 @@ async def post_trustee_step_1(
         election_short_name=election_short_name,
     )
 
+    # delete any previous shares
+    crud.delete_keygen_shares_by_sender_and_election_short_name(
+        session=session,
+        sender=trustee.participant_id,
+        election_short_name=election_short_name,
+    )
+
     # save the signed shares
     signed_encrypted_shares = trustee_data.signed_shares
     assert len(signed_encrypted_shares) == len(election.trustees)
@@ -351,19 +358,14 @@ async def get_trustee_step_3(
         election_short_name=election_short_name,
     )
 
-    key_gen_shares = crud.read_keygen_shares_by_receiver_and_election_short_name(
+    crud.delete_keygen_shares_by_receiver_and_election_short_name(
         session=session,
         receiver=trustee.participant_id,
         election_short_name=election_short_name,
     )
-    # sort the shares by sender
-    key_gen_shares = sorted(key_gen_shares, key=lambda k: k.sender)
 
-    return {
-        "recv_shares": [
-            json.loads(key_gen_share.share) for key_gen_share in key_gen_shares
-        ],
-    }  # TODO: delete, since already sent in step 2
+    # compute any other parameters needed in future versions of the protocol
+    return {} # currently returns an empty dictionary 
 
 
 @api_router.post(
