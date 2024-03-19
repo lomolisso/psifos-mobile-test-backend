@@ -4,29 +4,16 @@ from fastapi import APIRouter, Depends
 from app.dependencies import get_session
 from app.api.model import schemas, crud
 
+from Crypto.PublicKey import ECC
+
 api_router = APIRouter()
 
 
-# --- params ---
-@api_router.get("/{short_name}/get-election-params", status_code=200)
-async def get_election_params(short_name: str, session=Depends(get_session)):
-    curve = "secp521r1"
-    threshold = 2
-    num_participants = len(crud.read_election_by_short_name(session, short_name).trustees)
-    
-    return {
-        "tdkg": {
-            "curve": curve,
-            "threshold": threshold,
-            "num_participants": num_participants,
-        }
-    }
-
-
-@api_router.get("/{short_name}/get-randomness", status_code=200)
-async def get_randomness(short_name: str):
-    return {"randomness": "1234567890"}
-
+# --- t-DKG params ---
+@api_router.get("/{short_name}/get-tdkg-params", status_code=200)
+async def get_crypto_params(short_name: str, session=Depends(get_session)):
+    election = crud.read_election_by_short_name(session=session, short_name=short_name)
+    return json.loads(election.crypto_params)["tdkg"]
 
 @api_router.get(
     "/{election_short_name}/trustee/{trustee_name}/get-participant-id", status_code=200
@@ -47,8 +34,6 @@ async def get_participant_id(
         "participant_id": trustee.participant_id,
     }
 
-
-# --- polling step ---
 @api_router.get("/{election_short_name}/get-global-keygen-step", status_code=200)
 async def get_step(election_short_name: str, session=Depends(get_session)):
     """
@@ -61,7 +46,6 @@ async def get_step(election_short_name: str, session=Depends(get_session)):
         "message": "The global keygen step was retrieved successfully",
         "global_keygen_step": election.global_keygen_step,
     }
-
 
 @api_router.post(
     "/{election_short_name}/trustee/{trustee_name}/upload-cert", status_code=200
@@ -436,3 +420,42 @@ async def post_trustee_decrypt_and_prove(
     Decrypt and prove
     """
     return {"message": "The decryption was uploaded successfully"}
+
+
+# --- Election ---
+@api_router.post("/{short_name}/start-election", status_code=200)
+async def start_election(short_name: str, session=Depends(get_session)):
+    """
+    Start the election
+    """
+
+    election = crud.read_election_by_short_name(session=session, short_name=short_name)
+    if election.global_keygen_step != 4:
+        return {"message": "Some trustees have not completed the key generation"}
+    
+    # Parse the first broadcast of each trustee into ECC.EccPoint objects
+    curve = json.loads(election.crypto_params)["tdkg"]["curve"]
+    get_first_broadcast = lambda t: {
+        k: int(v) if k in ("x", "y") else v  # Convert x and y to ints, leave others as-is
+        for k, v in json.loads(t.signed_broadcasts)[0]["broadcast"].items()
+    }
+    _trustees_first_broadcast = [
+        ECC.EccPoint(curve=curve, **b)
+        for b in [get_first_broadcast(t) for t in election.trustees]
+    ]
+
+    # The election public key is the sum of the first broadcasts
+    _start, *_iterable = _trustees_first_broadcast
+    election_public_key = sum(_iterable, start=_start)
+
+    # Save election public key
+    election = crud.update_election_by_short_name(
+        session=session,
+        short_name=short_name,
+        fields={
+            "public_key": json.dumps({
+                "x": int(election_public_key.x),
+                "y": int(election_public_key.y)
+            })
+        }
+    )

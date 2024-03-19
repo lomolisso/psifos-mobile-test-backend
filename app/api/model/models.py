@@ -19,6 +19,7 @@ class Election(Base):
     short_name = Column(String, nullable=False, unique=True)
     public_key = Column(String, nullable=True)
     global_keygen_step = Column(Integer, default=0)
+    crypto_params = Column(String, nullable=True)
 
     # One-to-many relationships
     trustees = relationship("Trustee", cascade="all, delete", backref="psifos_election")

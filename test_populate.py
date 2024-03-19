@@ -1,3 +1,5 @@
+import json
+
 from app.database import engine, Base
 from app.api.model import crud
 
@@ -13,6 +15,13 @@ def main():
         session=session,
         fields={
             "short_name": "test_election",
+            "crypto_params": json.dumps({
+                "tdkg": {
+                    "curve": "secp521r1",
+                    "threshold": 2,
+                    "num_participants": 3,
+                }
+            })
         }
     )
 
