@@ -31,8 +31,8 @@ class CertificateOut(BaseCertificate):
 class TrusteeCertificates(BaseModel):
     certificates: list[CertificateOut]
 
-class SignedBroadcast(BaseModel):
-    broadcast: str  # Tuple(BigInt, BigInt) encoded as String
+class SignedCoefficient(BaseModel):
+    coefficient: str  # Tuple(BigInt, BigInt) encoded as String
     signature: ECSignature
 
 
@@ -42,7 +42,7 @@ class SignedShare(BaseModel):
 
 
 class KeyGenStep1Data(BaseModel):
-    signed_broadcasts: list[SignedBroadcast]
+    signed_coefficients: list[SignedCoefficient]
     signed_shares: list[SignedShare]
 
 

@@ -52,7 +52,7 @@ class Trustee(Base):
     local_keygen_step = Column(Integer, default=0)
 
     certificate = Column(String, nullable=True)
-    signed_broadcasts = Column(String, nullable=True)
+    signed_coefficients = Column(String, nullable=True)
     acknowledgements = Column(String, nullable=True)
     verification_key = Column(String, nullable=True)
 

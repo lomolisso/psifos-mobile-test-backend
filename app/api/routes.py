@@ -191,29 +191,29 @@ async def post_trustee_step_1(
             },
         )
 
-    # parse the signed broadcasts
-    _sign_broadcasts = [sb.model_dump() for sb in trustee_data.signed_broadcasts]
-    parsed_signed_broadcasts = []
-    for sb in _sign_broadcasts:
-        x, y = sb["broadcast"][1:-1].split(",")
-        parsed_signed_broadcasts.append(
+    # parse the signed coefficients
+    _sign_coefficients = [sb.model_dump() for sb in trustee_data.signed_coefficients]
+    parsed_signed_coefficients = []
+    for sb in _sign_coefficients:
+        x, y = sb["coefficient"][1:-1].split(",")
+        parsed_signed_coefficients.append(
             {
-                "broadcast": {"x": x, "y": y},
+                "coefficient": {"x": x, "y": y},
                 "signature": sb["signature"],
             }
         )
 
-    # save the signed broadcasts
+    # save the signed coefficients
     trustee = crud.update_trustee_by_uuid(
         session=session,
         uuid=trustee.uuid,
         fields={
             "local_keygen_step": 2,
-            "signed_broadcasts": json.dumps(parsed_signed_broadcasts),
+            "signed_coefficients": json.dumps(parsed_signed_coefficients),
         },
     )
 
-    # if all trustees have uploaded their signed broadcasts, update global keygen step
+    # if all trustees have uploaded their signed coefficients, update global keygen step
     if all(trustee.local_keygen_step == 2 for trustee in election.trustees):
         crud.update_election_by_short_name(
             session=session,
@@ -259,8 +259,8 @@ async def get_trustee_step_2(
         "signed_encrypted_shares": [
             json.loads(key_gen_share.share) for key_gen_share in key_gen_shares
         ],
-        "signed_broadcasts": [
-            json.loads(trustee.signed_broadcasts)
+        "signed_coefficients": [
+            json.loads(trustee.signed_coefficients)
             for trustee in sorted(election.trustees, key=lambda t: t.participant_id)
         ],
     }
@@ -433,19 +433,19 @@ async def start_election(short_name: str, session=Depends(get_session)):
     if election.global_keygen_step != 4:
         return {"message": "Some trustees have not completed the key generation"}
     
-    # Parse the first broadcast of each trustee into ECC.EccPoint objects
+    # Parse the first coefficient of each trustee into ECC.EccPoint objects
     curve = json.loads(election.crypto_params)["tdkg"]["curve"]
-    get_first_broadcast = lambda t: {
+    get_first_coefficient = lambda t: {
         k: int(v) if k in ("x", "y") else v  # Convert x and y to ints, leave others as-is
-        for k, v in json.loads(t.signed_broadcasts)[0]["broadcast"].items()
+        for k, v in json.loads(t.signed_coefficients)[0]["coefficient"].items()
     }
-    _trustees_first_broadcast = [
+    _trustees_first_coefficient = [
         ECC.EccPoint(curve=curve, **b)
-        for b in [get_first_broadcast(t) for t in election.trustees]
+        for b in [get_first_coefficient(t) for t in election.trustees]
     ]
 
-    # The election public key is the sum of the first broadcasts
-    _start, *_iterable = _trustees_first_broadcast
+    # The election public key is the sum of the first coefficients
+    _start, *_iterable = _trustees_first_coefficient
     election_public_key = sum(_iterable, start=_start)
 
     # Save election public key
